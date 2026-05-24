@@ -1,0 +1,10 @@
+{
+  "name": "@calo/database",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "private": true,
+  "dependencies": {
+    "mongoose": "^8.0.0",
+    "@calo/types": "1.0.0"
+  }
+}
