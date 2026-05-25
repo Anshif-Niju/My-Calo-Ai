@@ -5,6 +5,7 @@ import jwt from "jsonwebtoken";
 import passport from "passport";
 import qrcode from "qrcode";
 import speakeasy from "speakeasy";
+import { AuthenticatedRequest, protect } from "../middlewares/authMiddleware";
 
 const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "calo_secretKey";
@@ -285,7 +286,10 @@ router.get("/google", passport.authenticate("google", { scope: ["profile", "emai
 
 // 9. Redirect the user to Google Login Page
 
-router.get("/google/callback",passport.authenticate("google", { session: false, failureRedirect: "/login" }),(req: any, res) => {
+router.get(
+  "/google/callback",
+  passport.authenticate("google", { session: false, failureRedirect: "/login" }),
+  (req: any, res) => {
     const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET || "calo_secretKey", {
       expiresIn: "7d",
     });
@@ -293,5 +297,22 @@ router.get("/google/callback",passport.authenticate("google", { session: false, 
     res.redirect(`http://localhost:3000/oauth-success?token=${token}`);
   },
 );
+
+// 10. Get User Profile
+
+router.get("/me", protect as any, async (req: AuthenticatedRequest, res) => {
+  try {
+    const user = await UserModel.findById(req.user?.userId).select("-password");
+
+    if (!user) {
+      return res.status(404).json({ success: false, message: "User not found!" });
+    }
+
+    return res.status(200).json({ success: true, user });
+  } catch (error) {
+    console.error("Get Profile Error:", error);
+    return res.status(500).json({ success: false, message: "Server Error!" });
+  }
+});
 
 export default router;
