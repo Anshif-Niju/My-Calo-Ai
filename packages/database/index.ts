@@ -9,6 +9,7 @@ export const connectDB = async (mongoUri: string) => {
 const UserSchema = new Schema<IUserProfile>({
   name: { type: String, required: true },
   email: { type: String, required: true, unique: true },
+  password: { type: String, required: true },
   height: { type: Number, required: true },
   weight: { type: Number, required: true },
   targetWeight: { type: Number, required: true },
@@ -18,7 +19,7 @@ const UserSchema = new Schema<IUserProfile>({
   otp: { type: String },
   otpExpires: { type: Date },
   isVerified: { type: Boolean, default: false },
-  
+
   isTwoFactorEnabled: { type: Boolean, default: false },
   twoFactorSecret: { type: String },
 });

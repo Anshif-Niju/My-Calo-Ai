@@ -1,14 +1,17 @@
-import { connectDB } from "@calo/database";
-import cors from "cors";
 import dotenv from "dotenv";
+dotenv.config();
 import express, { Request, Response } from "express";
+import cors from "cors";
+import passport from "passport";
+import { connectDB } from "@calo/database";
+import "./config/passport";
 import authRoutes from "./routes/auth";
 
-dotenv.config();
 
 const app = express();
 app.use(cors());
 app.use(express.json());
+app.use(passport.initialize());
 
 app.use("/api/auth", authRoutes);
 

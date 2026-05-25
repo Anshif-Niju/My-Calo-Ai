@@ -2,6 +2,7 @@ import { UserModel } from "@calo/database";
 import bcrypt from "bcrypt";
 import { Request, Response, Router } from "express";
 import jwt from "jsonwebtoken";
+import passport from "passport";
 import qrcode from "qrcode";
 import speakeasy from "speakeasy";
 
@@ -9,6 +10,7 @@ const router = Router();
 const JWT_SECRET = process.env.JWT_SECRET || "calo_secretKey";
 
 // 1. SIGNUP ROUTE
+
 router.post("/signup", async (req: Request, res: Response) => {
   try {
     const { name, email, height, weight, targetWeight, fitnessGoal, dailyCalorieTarget, password } =
@@ -16,16 +18,17 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     const existingUser = await UserModel.findOne({ email });
     if (existingUser) {
-      return res.status(400).json({ message: "This Email already exists!" });
+      return res.status(400).json({ message: "This email already exists!" });
     }
     if (!password) {
-      return res.status(400).json({ message: "Password is Required!" });
+      return res.status(400).json({ message: "Password is required!" });
     }
 
     const salt = await bcrypt.genSalt(10);
     const hashedPassword = await bcrypt.hash(password, salt);
+
     const otp = Math.floor(100000 + Math.random() * 900000).toString();
-    const otpExpires = new Date(Date.now() + 10 * 60 * 1000);
+    const otpExpires = new Date(Date.now() + 10 * 60 * 1000); // 10 Minutes expiry
 
     const newUser = new UserModel({
       name,
@@ -43,10 +46,11 @@ router.post("/signup", async (req: Request, res: Response) => {
 
     await newUser.save();
 
-    console.log(`\n📧 [EMAIL SIMULATION] OTP Sent to ${email}: ${otp}\n`);
+    console.log(`\n=== [EMAIL SIMULATION] SIGNUP OTP ===`);
+    console.log(`Sent to ${email}: ${otp} \n=======================================\n`);
 
     return res.status(201).json({
-      message: "User registered successfully!",
+      message: "User registered successfully! Please verify your signup OTP.",
       user: {
         id: newUser._id,
         name: newUser.name,
@@ -59,14 +63,15 @@ router.post("/signup", async (req: Request, res: Response) => {
   }
 });
 
-// 2. VERIFY OTP ROUTE
+// 2. VERIFY SIGNUP OTP ROUTE
+
 router.post("/verify-otp", async (req: Request, res: Response) => {
   try {
     const { email, otp } = req.body;
 
     const user = await UserModel.findOne({ email });
     if (!user) {
-      return res.status(404).json({ message: "User Not FOund!" });
+      return res.status(404).json({ message: "User not found!" });
     }
 
     if (!user.otp || user.otp !== otp) {
@@ -74,7 +79,7 @@ router.post("/verify-otp", async (req: Request, res: Response) => {
     }
 
     if (user.otpExpires && new Date() > user.otpExpires) {
-      return res.status(400).json({ message: "OTP Time Expired!" });
+      return res.status(400).json({ message: "OTP time expired!" });
     }
 
     user.isVerified = true;
@@ -112,18 +117,20 @@ router.post("/login", async (req: Request, res: Response) => {
         .status(403)
         .json({ message: "Please verify your email via OTP before logging in!" });
     }
+
     const loginOtp = Math.floor(100000 + Math.random() * 900000).toString();
-    const loginOtpExpires = new Date(Date.now() + 5 * 60 * 1000);
+    const loginOtpExpires = new Date(Date.now() + 5 * 60 * 1000); // 5 Minutes expiry
 
     user.otp = loginOtp;
     user.otpExpires = loginOtpExpires;
     await user.save();
 
-    console.log(`\n🔑 [LOGIN OTP REQUIRED] Sent to ${email}: ${loginOtp}\n`);
+    console.log(`\n=== 🔑 [LOGIN OTP REQUIRED] ===`);
+    console.log(`Sent to ${email}: ${loginOtp}\n===============================\n`);
 
     return res.status(200).json({
       message: "LOGIN_OTP_REQUIRED",
-      info: "Verify OTP Send to your email",
+      info: "Verify OTP sent to your email",
     });
   } catch (error) {
     console.error("Login Error:", error);
@@ -131,7 +138,7 @@ router.post("/login", async (req: Request, res: Response) => {
   }
 });
 
-// 4. Verify OTP
+// 4. VERIFY LOGIN OTP ROUTE
 
 router.post("/verify-login-otp", async (req: Request, res: Response) => {
   try {
@@ -140,10 +147,12 @@ router.post("/verify-login-otp", async (req: Request, res: Response) => {
     const user = await UserModel.findOne({ email });
     if (!user) return res.status(404).json({ message: "User not found!" });
 
-    if (!user.otp || user.otp !== otp)
+    if (!user.otp || user.otp !== otp) {
       return res.status(400).json({ message: "Invalid Login OTP!" });
-    if (user.otpExpires && new Date() > user.otpExpires)
+    }
+    if (user.otpExpires && new Date() > user.otpExpires) {
       return res.status(400).json({ message: "Login OTP Expired!" });
+    }
 
     user.otp = undefined;
     user.otpExpires = undefined;
@@ -153,14 +162,14 @@ router.post("/verify-login-otp", async (req: Request, res: Response) => {
       return res.status(200).json({
         message: "2FA_REQUIRED",
         userId: user._id,
-        info: "Login OTP verified successfully!",
+        info: "Login OTP verified successfully! Google Authenticator Code Required.",
       });
     }
 
     const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1d" });
 
     return res.status(200).json({
-      message: "Login successful! 🚀",
+      message: "Login successful!",
       token,
       user: { id: user._id, name: user.name, email: user.email },
     });
@@ -170,41 +179,7 @@ router.post("/verify-login-otp", async (req: Request, res: Response) => {
   }
 });
 
-// 5. Verifying 2-Factor AUthentication
-
-router.post("/verify-2fa", async (req: Request, res: Response) => {
-  try {
-    const { userId, twoFactorCode } = req.body;
-
-    const user = await UserModel.findById(userId);
-    if (!user || !user.twoFactorSecret) {
-      return res.status(400).json({ message: "User or 2FA setup not found!" });
-    }
-
-    const verified = speakeasy.totp.verify({
-      secret: user.twoFactorSecret,
-      encoding: "base32",
-      token: twoFactorCode,
-    });
-
-    if (!verified) {
-      return res.status(400).json({ message: "Invalid Authenticator Code!" });
-    }
-
-    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1d" });
-
-    return res.status(200).json({
-      message: "2FA Login successful! 🛡️🚀",
-      token,
-      user: { id: user._id, name: user.name, email: user.email },
-    });
-  } catch (error) {
-    console.error("2FA Verification Error:", error);
-    return res.status(500).json({ message: "Server error during 2FA login." });
-  }
-});
-
-// 6. Creating Two Factor Authentication
+// 5. SETUP 2-FACTOR AUTHENTICATION
 
 router.post("/setup-2fa", async (req: Request, res: Response) => {
   try {
@@ -237,7 +212,7 @@ router.post("/setup-2fa", async (req: Request, res: Response) => {
   }
 });
 
-// 7. Verifying Two Factor Auhtentication First Time
+// 6. ACTIVATE 2-FACTOR AUTHENTICATION (FIRST TIME)
 
 router.post("/activate-2fa", async (req: Request, res: Response) => {
   try {
@@ -262,12 +237,61 @@ router.post("/activate-2fa", async (req: Request, res: Response) => {
     await user.save();
 
     return res.status(200).json({
-      message: "Google Authenticator 2FA activated successfully! ",
+      message: "Google Authenticator 2FA activated successfully!",
     });
   } catch (error) {
     console.error("2FA Activation Error:", error);
     return res.status(500).json({ message: "Server error during 2FA activation." });
   }
 });
+
+// 7. VERIFY 2-FACTOR AUTHENTICATION (SUBSEQUENT LOGINS)
+
+router.post("/verify-2fa", async (req: Request, res: Response) => {
+  try {
+    const { userId, twoFactorCode } = req.body;
+
+    const user = await UserModel.findById(userId);
+    if (!user || !user.twoFactorSecret) {
+      return res.status(400).json({ message: "User or 2FA setup not found!" });
+    }
+
+    const verified = speakeasy.totp.verify({
+      secret: user.twoFactorSecret,
+      encoding: "base32",
+      token: twoFactorCode,
+    });
+
+    if (!verified) {
+      return res.status(400).json({ message: "Invalid Authenticator Code!" });
+    }
+
+    const token = jwt.sign({ userId: user._id }, JWT_SECRET, { expiresIn: "1d" });
+
+    return res.status(200).json({
+      message: "2FA Login successful!",
+      token,
+      user: { id: user._id, name: user.name, email: user.email },
+    });
+  } catch (error) {
+    console.error("2FA Verification Error:", error);
+    return res.status(500).json({ message: "Server error during 2FA login." });
+  }
+});
+
+// 8. Redirect the user to Google Login Page
+
+router.get("/google", passport.authenticate("google", { scope: ["profile", "email"] }));
+
+// 9. Redirect the user to Google Login Page
+
+router.get("/google/callback",passport.authenticate("google", { session: false, failureRedirect: "/login" }),(req: any, res) => {
+    const token = jwt.sign({ userId: req.user._id }, process.env.JWT_SECRET || "calo_secretKey", {
+      expiresIn: "7d",
+    });
+
+    res.redirect(`http://localhost:3000/oauth-success?token=${token}`);
+  },
+);
 
 export default router;

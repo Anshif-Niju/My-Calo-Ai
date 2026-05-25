@@ -11,7 +11,13 @@
     "dev:web": "npm run dev --workspace=web"
   },
   "devDependencies": {
-    "typescript": "^5.3.3",
-    "ts-node": "^10.9.2"
+    "@types/passport": "^1.0.17",
+    "@types/passport-google-oauth20": "^2.0.17",
+    "ts-node": "^10.9.2",
+    "typescript": "^5.3.3"
+  },
+  "dependencies": {
+    "passport": "^0.7.0",
+    "passport-google-oauth20": "^2.0.0"
   }
 }
