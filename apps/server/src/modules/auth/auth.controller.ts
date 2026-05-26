@@ -6,6 +6,7 @@ import qrcode from "qrcode";
 import { UserModel } from "@calo/database";
 import { generateTokens, sendRefreshTokenCookie } from "./auth.services";
 
+
 // 1. SIGNUP
 
 export const signup = async (req: Request, res: Response) => {
@@ -124,6 +125,7 @@ export const verifyLoginOtp = async (req: Request, res: Response) => {
 };
 
 // 5. SETUP 2FA
+
 export const setup2FA = async (req: Request, res: Response) => {
   try {
     const { userId } = req.body;
@@ -144,6 +146,7 @@ export const setup2FA = async (req: Request, res: Response) => {
 };
 
 // 6. ACTIVATE 2FA
+
 export const activate2FA = async (req: Request, res: Response) => {
   try {
     const { userId, code } = req.body;
@@ -164,6 +167,7 @@ export const activate2FA = async (req: Request, res: Response) => {
 };
 
 // 7. VERIFY 2FA (LOGINS)
+
 export const verify2FA = async (req: Request, res: Response) => {
   try {
     const { userId, twoFactorCode } = req.body;
@@ -188,6 +192,7 @@ export const verify2FA = async (req: Request, res: Response) => {
 };
 
 //  8. SILENT REFRESH CONTROLLER
+
 export const handleRefreshToken = async (req: Request, res: Response) => {
   try {
     const token = req.cookies.refreshToken;
@@ -204,6 +209,7 @@ export const handleRefreshToken = async (req: Request, res: Response) => {
 };
 
 //  9. GOOGLE OAUTH CALLBACK
+
 export const handleGoogleCallback = async (req: any, res: Response) => {
   try {
     if (!req.user) return res.redirect("http://localhost:3000/login?error=auth_failed");
@@ -218,6 +224,7 @@ export const handleGoogleCallback = async (req: any, res: Response) => {
 };
 
 //  10. GET PROFILE
+
 export const getUserProfile = async (req: any, res: Response) => {
   try {
     const user = await UserModel.findById(req.user?.userId).select("-password");
